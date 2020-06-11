@@ -75,6 +75,20 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 			si := sensorInfo.(map[string]interface{})
 			mm[sensor] = make(map[string]interface{})
 			fmt.Println("si ", si)
+			fmt.Println("si[field ", si["field"])
+			se := map[string]interface{}{}
+			f, foundF := si["field"]
+			if !foundF {
+				continue
+			}
+			se["field"] = f
+			m, foundM := si["multiplier"]
+			if foundM {
+				se["multiplier"] = m
+			} else {
+				se["multiplier"] = 1.0
+			}
+			mm[sensor] = se
 			//fmt.Println("f ", f, "found ", found)
 		}
 
@@ -97,7 +111,9 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		// fmt.Println(m)
 		// mm[i] = se
 	}
+	fmt.Println("")
 	fmt.Println(mm)
+	fmt.Println("")
 
 	act := &Activity{
 		EnvironmentURL: commonURL + environmentalEndpoint,
