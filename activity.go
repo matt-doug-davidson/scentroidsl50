@@ -3,7 +3,11 @@ package scentroidsl50
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
 
+	"github.com/matt-doug-davidson/timestamps"
 	"github.com/project-flogo/core/activity"
 	"github.com/project-flogo/core/data/metadata"
 )
@@ -14,6 +18,7 @@ type Activity struct {
 	PollutantURL   string
 	SerialNumber   string
 	Mappings       map[string]map[string]interface{}
+	Entity         string
 }
 
 const (
@@ -91,28 +96,10 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 			mm[sensor] = se
 			//fmt.Println("f ", f, "found ", found)
 		}
-
-		// mm[i] = make(map[string]interface{})
-		// fmt.Println(i, v)
-		// se := map[string]interface{}{}
-		// //f, found := result[i]["field"]
-		// if !found {
-		// 	continue
-		// }
-		// se["field"] = f
-		// m, mFound := s.Mappings[i]["multiplier"]
-		// if !mFound {
-		// 	se["multiplier"] = 1.0
-		// } else {
-		// 	se["multiplier"] = m
-		// }
-
-		// fmt.Println(se)
-		// fmt.Println(m)
-		// mm[i] = se
 	}
 	fmt.Println("")
 	fmt.Println(mm)
+	fmt.Println(mm["O3"]["field"])
 	fmt.Println("")
 
 	act := &Activity{
@@ -120,6 +107,7 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 		PollutantURL:   commonURL + pollutantEndpoint,
 		SerialNumber:   s.SerialNumber,
 		Mappings:       mm,
+		Entity:         s.Entity,
 	}
 
 	logger.Info("scentroidsl50:New exit")
@@ -130,6 +118,122 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	logger := ctx.Logger()
 	logger.Info("scentroidsl50:Eval enter")
+
+	var timestamp string
+	values := []map[string]interface{}{}
+	values, timestamp = a.getPollutantData(values)
+	fmt.Println(values)
+	values, _ = a.getEnvironmentalData(values)
+	fmt.Println(values)
+	for _, v := range values {
+		fmt.Println(v)
+	}
+	// Convert time from message to UTCZ time-string
+	fmt.Println(timestamp)
+	msts := timestamps.MillisecondTimestamp{}
+	datetime := msts.ConvertUTCZ(timestamp)
+
+	message := map[string]interface{}{}
+	message["values"] = values
+	message["datetime"] = datetime
+	fmt.Println(message)
+
+	output := map[string]interface{}{}
+	output["data"] = message
+	output["entity"] = a.Entity
+
 	logger.Info("scentroidsl50:Eval exit")
 	return true, nil
+}
+
+func (a *Activity) getData(url string) ([]byte, error) {
+
+	client := http.Client{Timeout: 5 * time.Second}
+
+	reqGet, _ := http.NewRequest("GET", url, nil)
+
+	// Build the query
+	q := reqGet.URL.Query()
+	q.Add("sn", a.SerialNumber)
+	q.Add("latest", "true")
+	reqGet.URL.RawQuery = q.Encode()
+
+	resGet, err := client.Do(reqGet)
+	if err != nil {
+		fmt.Println("Error:", err.Error())
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(resGet.Body)
+	if err != nil {
+		fmt.Println("Error:", err.Error())
+		return nil, err
+	}
+
+	return body, nil
+}
+
+func (a *Activity) getEnvironmentalData(values []map[string]interface{}) ([]map[string]interface{}, string) {
+	body, err := a.getData(a.EnvironmentURL)
+	if err != nil {
+		return nil, ""
+	}
+
+	r := map[string]interface{}{}
+	json.Unmarshal(body, &r)
+	rl := r["items"].([]interface{})
+	var msgTime string
+	// The environmental measurements are wrapped in an extra slice that
+	// is compensated for here.
+	for _, v := range rl {
+		value := map[string]interface{}{}
+		vv := v.([]interface{})
+		amount := vv[valueIndex].(float64)
+		sensor := vv[sensorIndex].(string)
+		msgTime = vv[msgTimeIndex].(string)
+
+		// Go says this is a float so we have to then convert to int
+		msrmenttID := vv[measurementIDIndex].(float64)
+		measurementID := int(msrmenttID)
+		if measurementID == 4 || measurementID == 5 {
+			sensor += "(internal)"
+		}
+		if measurementID == 6 || measurementID == 7 {
+			sensor += "(external)"
+		}
+
+		value["amount"] = amount * a.Mappings[sensor]["multiplier"].(float64)
+		value["field"] = a.Mappings[sensor]["field"]
+		values = append(values, value)
+	}
+	return values, msgTime
+}
+
+func (a *Activity) getPollutantData(values []map[string]interface{}) ([]map[string]interface{}, string) {
+	body, err := a.getData(a.PollutantURL)
+	if err != nil {
+		return nil, ""
+	}
+
+	r := map[string]interface{}{}
+	json.Unmarshal(body, &r)
+	rl := r["items"].([]interface{})
+	msgTime := ""
+	for _, v := range rl {
+		vu := v.([]interface{})
+		for _, viv := range vu {
+			value := map[string]interface{}{}
+			vv := viv.([]interface{})
+			amount := vv[valueIndex].(float64)
+			sensor := vv[sensorIndex].(string)
+			// Convert sensor to field
+			msgTime = vv[msgTimeIndex].(string)
+			// Measurement ID not used so it was removed
+
+			value["amount"] = amount * a.Mappings[sensor]["multiplier"].(float64)
+			value["field"] = a.Mappings[sensor]["field"]
+			values = append(values, value)
+		}
+		fmt.Println(values)
+	}
+	return values, msgTime
 }
