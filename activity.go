@@ -142,6 +142,14 @@ func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	output["data"] = message
 	output["entity"] = a.Entity
 
+	fmt.Println(output)
+
+	err = ctx.SetOutput("connectorMsg", output)
+	if err != nil {
+		logger.Error("Failed to set output oject ", err.Error())
+		return false, err
+	}
+
 	logger.Info("scentroidsl50:Eval exit")
 	return true, nil
 }

@@ -1,10 +1,10 @@
 {
-    "name": "flogo-aeroqualaqy1",
+    "name": "flogo-scentroidsl50",
     "type": "flogo:activity",
     "version": "0.0.1",
-    "title": "Aeroqual AQY1",
-    "description": "Connector for Aeroqual AQY1",
-    "homepage": "https://github.com/matt-doug-davidson/aeroqualaqy1",
+    "title": "Scentroid SL50",
+    "description": "Connector for Scentroid SL50",
+    "homepage": "https://github.com/matt-doug-davidson/scentroidsl50",
     "settings":[
       {
         "name": "host",
