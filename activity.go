@@ -62,11 +62,21 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 	json.Unmarshal([]byte(s.Mappings), &result)
 
 	mm := map[string]map[string]interface{}{}
-	for i, v := range result {
+	for key, mapper := range result {
 		//a.Mappings[i] = make(map[string]interface{})
-		fmt.Println("i[", i, "]=", v)
-		fmt.Printf("i (type) %T\n", i)
-		fmt.Printf("v (type) %T\n", v)
+		fmt.Println("result[", key, "]=", mapper)
+		fmt.Printf("key (type) %T\n", key)
+		fmt.Printf("mapper (type) %T\n", mapper)
+		mapper1 := mapper.(map[string]interface{})
+		for sensor, sensorInfo := range mapper1 {
+			fmt.Println("mapper1[", sensor, "]=", sensorInfo)
+			fmt.Printf("sensor (type) %T\n", sensor)
+			fmt.Printf("sensorInfo (type) %T\n", sensorInfo)
+			si := sensorInfo.(map[string]interface{})
+			mm[sensor] = make(map[string]interface{})
+			fmt.Println("si ", si)
+			//fmt.Println("f ", f, "found ", found)
+		}
 
 		// mm[i] = make(map[string]interface{})
 		// fmt.Println(i, v)
