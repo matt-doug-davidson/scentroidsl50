@@ -19,6 +19,7 @@ type Activity struct {
 	SerialNumber   string
 	Mappings       map[string]map[string]interface{}
 	Entity         string
+	EvalContext    activity.Context
 }
 
 const (
@@ -118,6 +119,9 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	logger := ctx.Logger()
 	logger.Info("scentroidsl50:Eval enter")
+	fmt.Println(a.EvalContext)
+	a.EvalContext = ctx
+	fmt.Println(a.EvalContext)
 
 	var timestamp string
 	values := []map[string]interface{}{}
