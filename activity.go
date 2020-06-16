@@ -19,7 +19,6 @@ type Activity struct {
 	SerialNumber   string
 	Mappings       map[string]map[string]interface{}
 	Entity         string
-	EvalContext    activity.Context
 }
 
 const (
@@ -68,20 +67,11 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 	json.Unmarshal([]byte(s.Mappings), &result)
 
 	mm := map[string]map[string]interface{}{}
-	for key, mapper := range result {
-		//a.Mappings[i] = make(map[string]interface{})
-		fmt.Println("result[", key, "]=", mapper)
-		fmt.Printf("key (type) %T\n", key)
-		fmt.Printf("mapper (type) %T\n", mapper)
+	for _, mapper := range result {
 		mapper1 := mapper.(map[string]interface{})
 		for sensor, sensorInfo := range mapper1 {
-			fmt.Println("mapper1[", sensor, "]=", sensorInfo)
-			fmt.Printf("sensor (type) %T\n", sensor)
-			fmt.Printf("sensorInfo (type) %T\n", sensorInfo)
 			si := sensorInfo.(map[string]interface{})
 			mm[sensor] = make(map[string]interface{})
-			fmt.Println("si ", si)
-			fmt.Println("si[field ", si["field"])
 			se := map[string]interface{}{}
 			f, foundF := si["field"]
 			if !foundF {
@@ -95,13 +85,8 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 				se["multiplier"] = 1.0
 			}
 			mm[sensor] = se
-			//fmt.Println("f ", f, "found ", found)
 		}
 	}
-	fmt.Println("")
-	fmt.Println(mm)
-	fmt.Println(mm["O3"]["field"])
-	fmt.Println("")
 
 	act := &Activity{
 		EnvironmentURL: commonURL + environmentalEndpoint,
@@ -119,34 +104,23 @@ func New(ctx activity.InitContext) (activity.Activity, error) {
 func (a *Activity) Eval(ctx activity.Context) (done bool, err error) {
 	logger := ctx.Logger()
 	logger.Info("scentroidsl50:Eval enter")
-	fmt.Println(a.EvalContext)
-	a.EvalContext = ctx
-	fmt.Println(a.EvalContext)
 
 	var timestamp string
 	values := []map[string]interface{}{}
 	values, timestamp = a.getPollutantData(values)
-	fmt.Println(values)
 	values, _ = a.getEnvironmentalData(values)
-	fmt.Println(values)
-	for _, v := range values {
-		fmt.Println(v)
-	}
+
 	// Convert time from message to UTCZ time-string
-	fmt.Println(timestamp)
 	msts := timestamps.MillisecondTimestamp{}
 	datetime := msts.ConvertUTCZ(timestamp)
 
 	message := map[string]interface{}{}
 	message["values"] = values
 	message["datetime"] = datetime
-	fmt.Println(message)
 
 	output := map[string]interface{}{}
 	output["data"] = message
 	output["entity"] = a.Entity
-
-	fmt.Println(output)
 
 	err = ctx.SetOutput("connectorMsg", output)
 	if err != nil {
@@ -175,6 +149,7 @@ func (a *Activity) getData(url string) ([]byte, error) {
 		fmt.Println("Error:", err.Error())
 		return nil, err
 	}
+
 	body, err := ioutil.ReadAll(resGet.Body)
 	if err != nil {
 		fmt.Println("Error:", err.Error())
@@ -245,7 +220,6 @@ func (a *Activity) getPollutantData(values []map[string]interface{}) ([]map[stri
 			value["field"] = a.Mappings[sensor]["field"]
 			values = append(values, value)
 		}
-		fmt.Println(values)
 	}
 	return values, msgTime
 }
